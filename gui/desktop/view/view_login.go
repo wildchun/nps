@@ -1,10 +1,11 @@
 package view
 
 import (
+	"errors"
+
 	"ehang.io/nps/gui/desktop/api"
 	"ehang.io/nps/lib/file"
 	"ehang.io/nps/lib/version"
-	"errors"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
@@ -24,6 +25,7 @@ func NewLogin() *Login {
 	m := &Login{}
 	m.Window = fyne.CurrentApp().NewWindow("登录 " + version.VERSION + " (WildChun)")
 	m.Window.SetContent(m.setupUi())
+	m.Window.Resize(fyne.NewSize(480, 320))
 	return m
 }
 func (m *Login) setupUi() fyne.CanvasObject {
@@ -49,26 +51,35 @@ func (m *Login) onLoginBtnClicked() {
 		dialog.ShowError(errors.New("密钥不能为空"), m.Window)
 		return
 	}
-	if _, err := api.GetKey(); err != nil {
-		dialog.ShowError(errors.New("连不了服务武器:艹"), m.Window)
-		return
-	}
-	cltList, err := api.GetList()
-	if err != nil {
-		dialog.ShowError(errors.New("鉴权失败:服务器错误"), m.Window)
-		return
-	}
-	for _, c := range cltList.Rows {
-		if c.VerifyKey == userKey {
-			m.LoginSuccess(c)
+	m.ui.loginBtn.Text = "登录中..."
+	m.ui.loginBtn.Refresh()
+	go func(userKey string) {
+		defer func() {
+			m.ui.loginBtn.Text = "登录"
+			m.ui.loginBtn.Refresh()
+		}()
+		if _, err := api.GetKey(); err != nil {
+			dialog.ShowError(errors.New("连不了服务武器:艹"+err.Error()), m.Window)
 			return
 		}
-	}
-	dialog.ShowError(errors.New("鉴权失败:密钥错误"), m.Window)
+		cltList, err := api.GetList()
+		if err != nil {
+			dialog.ShowError(errors.New("鉴权失败:服务器错误"+err.Error()), m.Window)
+			return
+		}
+		for _, c := range cltList.Rows {
+			if c.VerifyKey == userKey {
+				m.LoginSuccess(c)
+				return
+			}
+		}
+		dialog.ShowError(errors.New("鉴权失败:密钥错误"+err.Error()), m.Window)
+	}(userKey)
 }
 
 func (m *Login) LoginSuccess(c *file.Client) {
-	m.Window.Hide()
-	v := NewVClient(c)
+	v := NewClient(c)
+	v.Window.CenterOnScreen()
 	v.Window.Show()
+	m.Window.Close()
 }

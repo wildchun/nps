@@ -1,6 +1,10 @@
 package main
 
 import (
+	"os"
+	"strings"
+
+	_ "ehang.io/nps/gui/desktop/inerlog"
 	"ehang.io/nps/gui/desktop/view"
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/daemon"
@@ -8,8 +12,6 @@ import (
 	"fyne.io/fyne/v2/app"
 	"github.com/astaxie/beego/logs"
 	"github.com/flopp/go-findfont"
-	"os"
-	"strings"
 )
 
 func init() {
@@ -24,12 +26,13 @@ func init() {
 			break
 		}
 	}
-	logs.Register("desktop", func() logs.Logger { return new(LoggerMessage) })
 }
 
 func main() {
 	daemon.InitDaemon("npc", common.GetRunPath(), common.GetTmpPath())
-	_ = logs.SetLogger("desktop")
+	_ = logs.SetLogger("inerlog")
 	fyne.SetCurrentApp(app.New())
-	view.NewLogin().Window.ShowAndRun()
+	w := view.NewLogin().Window
+	w.CenterOnScreen()
+	w.ShowAndRun()
 }

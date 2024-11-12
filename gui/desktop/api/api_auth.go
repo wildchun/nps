@@ -1,19 +1,21 @@
 package api
 
 import (
-	"ehang.io/nps/lib/crypt"
 	"strconv"
 	"time"
+
+	"ehang.io/nps/lib/crypt"
 )
 
 const (
-	Server   = "124.223.42.242:10010"
-	CryptKey = "wildchunwildchun"
+	Server    = "124.223.42.242:10010"
+	NpsServer = "124.223.42.242:10011"
+	CryptKey  = "wildchunwildchun"
 )
 
 var AuthKey string
 
-//map[string][]string
+// map[string][]string
 
 func BuildAuthForm(d map[string][]string) map[string][]string {
 	form := make(map[string][]string)

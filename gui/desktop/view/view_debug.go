@@ -12,8 +12,8 @@ type Debug struct {
 	Window fyne.Window
 }
 
-func NewDebug() *VClient {
-	m := &VClient{}
+func NewDebug() *Client {
+	m := &Client{}
 	m.Window = fyne.CurrentApp().NewWindow("接口测试")
 	m.Window.SetContent(m.setupUi())
 	return m
