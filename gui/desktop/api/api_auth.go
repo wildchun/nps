@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	Server    = "124.223.42.242:10010"
-	NpsServer = "124.223.42.242:10011"
+	ServerIp  = "124.223.42.242"
+	Server    = ServerIp + ":10010"
+	NpsServer = ServerIp + ":10011"
 	CryptKey  = "wildchunwildchun"
 )
 

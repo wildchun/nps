@@ -49,7 +49,7 @@ func NewClient(c *file.Client) *Client {
 	m.d.cl = new(client.TRPClient)
 	m.Window = fyne.CurrentApp().NewWindow("内网穿透客户端 " + version.VERSION + " (WildChun)")
 	m.Window.SetContent(m.setupUi())
-	m.Window.Resize(fyne.NewSize(480, 320))
+	m.Window.Resize(fyne.NewSize(600, 400))
 	return m
 }
 
@@ -61,22 +61,51 @@ func (m *Client) setupUi() fyne.CanvasObject {
 	)
 	m.ui.tunnelTable = widget.NewTable(
 		func() (int, int) {
-			return len(m.d.tunnels), 3
+			return len(m.d.tunnels) + 1, 3
 		},
 		func() fyne.CanvasObject {
 			return widget.NewLabel("wide content")
 		},
 		func(i widget.TableCellID, o fyne.CanvasObject) {
-			tunnel := m.d.tunnels[i.Row]
-			switch i.Col {
-			case 0:
-				o.(*widget.Label).SetText(tunnel.Remark)
-			case 1:
-				o.(*widget.Label).SetText(strconv.Itoa(tunnel.Port))
-			case 2:
-				o.(*widget.Label).SetText(tunnel.Target.TargetStr)
+			if i.Row == 0 {
+				switch i.Col {
+				case 0:
+					o.(*widget.Label).SetText("备注")
+				case 1:
+					o.(*widget.Label).SetText("公网")
+				case 2:
+					o.(*widget.Label).SetText("本地")
+				}
+			} else {
+				tunnel := m.d.tunnels[i.Row-1]
+				switch i.Col {
+				case 0:
+
+					o.(*widget.Label).SetText(tunnel.Remark)
+				case 1:
+					o.(*widget.Label).SetText(api.ServerIp + ":" + strconv.Itoa(tunnel.Port))
+				case 2:
+					o.(*widget.Label).SetText(tunnel.Target.TargetStr)
+				}
 			}
 		})
+	m.ui.tunnelTable.SetColumnWidth(0, 150)
+	m.ui.tunnelTable.SetColumnWidth(1, 200)
+	m.ui.tunnelTable.SetColumnWidth(2, 200)
+	m.ui.tunnelTable.OnSelected = func(id widget.TableCellID) {
+		if id.Row == 0 {
+			return
+		}
+		tunnel := m.d.tunnels[id.Row-1]
+		switch id.Col {
+		case 0:
+			m.Window.Clipboard().SetContent(tunnel.Remark)
+		case 1:
+			m.Window.Clipboard().SetContent(api.ServerIp + ":" + strconv.Itoa(tunnel.Port))
+		case 2:
+			m.Window.Clipboard().SetContent(tunnel.Target.TargetStr)
+		}
+	}
 
 	go func() {
 		tunnels, err := api.GetTunnel(m.d.client.Id)
