@@ -23,14 +23,13 @@ type Login struct {
 
 func NewLogin() *Login {
 	m := &Login{}
-	m.Window = fyne.CurrentApp().NewWindow("登录 " + version.VERSION + " (WildChun)")
+	m.Window = fyne.CurrentApp().NewWindow("登录-内穿" + version.VERSION + " (WildChun)")
 	m.Window.SetContent(m.setupUi())
 	m.Window.Resize(fyne.NewSize(480, 320))
 	return m
 }
 func (m *Login) setupUi() fyne.CanvasObject {
 	m.ui.keyEdit = widget.NewPasswordEntry()
-	m.ui.keyEdit.SetText("k4am8wi99s7h2dyl")
 	m.ui.loginBtn = widget.NewButton("登录", m.onLoginBtnClicked)
 	return container.NewVBox(
 		container.New(layout.NewFormLayout(),
@@ -59,7 +58,7 @@ func (m *Login) onLoginBtnClicked() {
 			m.ui.loginBtn.Refresh()
 		}()
 		if _, err := api.GetKey(); err != nil {
-			dialog.ShowError(errors.New("连不了服务武器:艹"+err.Error()), m.Window)
+			dialog.ShowError(errors.New("连不了服务武器..."+err.Error()), m.Window)
 			return
 		}
 		cltList, err := api.GetList()
@@ -73,7 +72,7 @@ func (m *Login) onLoginBtnClicked() {
 				return
 			}
 		}
-		dialog.ShowError(errors.New("鉴权失败:密钥错误"+err.Error()), m.Window)
+		dialog.ShowError(errors.New("鉴权失败:密钥错误"), m.Window)
 	}(userKey)
 }
 
@@ -81,5 +80,6 @@ func (m *Login) LoginSuccess(c *file.Client) {
 	v := NewClient(c)
 	v.Window.CenterOnScreen()
 	v.Window.Show()
+	v.Window.Content().Move(m.Window.Content().Position())
 	m.Window.Close()
 }

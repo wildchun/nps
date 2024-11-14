@@ -36,9 +36,9 @@ type Client struct {
 }
 
 const (
-	STATUS_START     = "启动"
-	STATUS_STOP      = "停止"
-	STATUS_RECONNECT = "重连中"
+	STATUS_START     = "给我开始穿!"
+	STATUS_STOP      = "给我停了!"
+	STATUS_RECONNECT = "别急，MD，在重连..."
 )
 
 func NewClient(c *file.Client) *Client {
@@ -47,7 +47,7 @@ func NewClient(c *file.Client) *Client {
 	m.d.status = STATUS_START
 	m.d.refreshCh = make(chan struct{})
 	m.d.cl = new(client.TRPClient)
-	m.Window = fyne.CurrentApp().NewWindow("内网穿透客户端 " + version.VERSION + " (WildChun)")
+	m.Window = fyne.CurrentApp().NewWindow("客户端-内穿" + version.VERSION + " (WildChun)")
 	m.Window.SetContent(m.setupUi())
 	m.Window.Resize(fyne.NewSize(600, 400))
 	return m
@@ -67,26 +67,15 @@ func (m *Client) setupUi() fyne.CanvasObject {
 			return widget.NewLabel("wide content")
 		},
 		func(i widget.TableCellID, o fyne.CanvasObject) {
+			lab := o.(*widget.Label)
 			if i.Row == 0 {
-				switch i.Col {
-				case 0:
-					o.(*widget.Label).SetText("备注")
-				case 1:
-					o.(*widget.Label).SetText("公网")
-				case 2:
-					o.(*widget.Label).SetText("本地")
-				}
+				lab.SetText([...]string{"备注", "公网", "本地"}[i.Col])
 			} else {
 				tunnel := m.d.tunnels[i.Row-1]
-				switch i.Col {
-				case 0:
-
-					o.(*widget.Label).SetText(tunnel.Remark)
-				case 1:
-					o.(*widget.Label).SetText(api.ServerIp + ":" + strconv.Itoa(tunnel.Port))
-				case 2:
-					o.(*widget.Label).SetText(tunnel.Target.TargetStr)
-				}
+				lab.SetText([...]string{tunnel.Remark,
+					api.ServerIp + ":" + strconv.Itoa(tunnel.Port),
+					tunnel.Target.TargetStr,
+				}[i.Col])
 			}
 		})
 	m.ui.tunnelTable.SetColumnWidth(0, 150)
@@ -107,14 +96,7 @@ func (m *Client) setupUi() fyne.CanvasObject {
 		}
 	}
 
-	go func() {
-		tunnels, err := api.GetTunnel(m.d.client.Id)
-		if err != nil {
-			return
-		}
-		m.d.tunnels = tunnels
-		m.ui.tunnelTable.Refresh()
-	}()
+	m.onUpdateTunnelBtnClicked()
 
 	m.ui.startBtn = widget.NewButton(m.d.status, m.onStartBtnClicked)
 	go func() {
@@ -123,6 +105,8 @@ func (m *Client) setupUi() fyne.CanvasObject {
 			m.ui.startBtn.SetText(m.d.status)
 		}
 	}()
+
+	updateTunnelBtn := widget.NewButton("更新tunnel", m.onUpdateTunnelBtnClicked)
 
 	m.ui.logBox = widget.NewMultiLineEntry()
 
@@ -134,7 +118,7 @@ func (m *Client) setupUi() fyne.CanvasObject {
 	}()
 
 	return container.NewBorder(
-		container.NewHBox(info, m.ui.startBtn),
+		container.NewHBox(info, updateTunnelBtn, m.ui.startBtn),
 		nil,
 		nil,
 		nil,
@@ -151,10 +135,22 @@ func (m *Client) setStatus(status string) {
 	m.d.refreshCh <- struct{}{}
 }
 
+func (m *Client) onUpdateTunnelBtnClicked() {
+	go func() {
+		tunnels, err := api.GetTunnel(m.d.client.Id)
+		if err != nil {
+			return
+		}
+		m.d.tunnels = tunnels
+		m.ui.tunnelTable.Refresh()
+	}()
+}
+
 func (m *Client) onStartBtnClicked() {
 	m.d.start = !m.d.start
 	if m.d.start {
 		// 启动
+		inerlog.Clear()
 		m.d.closing = false
 		go func() {
 			for {
