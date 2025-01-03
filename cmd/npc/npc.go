@@ -2,6 +2,7 @@ package main
 
 import (
 	"ehang.io/nps/client"
+	"ehang.io/nps/cmd/npc/ttu"
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/config"
 	"ehang.io/nps/lib/file"
@@ -14,9 +15,11 @@ import (
 	"github.com/kardianos/service"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -67,7 +70,7 @@ func main() {
 	svcConfig := &service.Config{
 		Name:        "Npc",
 		DisplayName: "nps内网穿透客户端",
-		Description: "一款轻量级、功能强大的内网穿透代理服务器。支持tcp、udp流量转发，支持内网http代理、内网socks5代理，同时支持snappy压缩、站点保护、加密传输、多路复用、header修改等。支持web图形化管理，集成多用户模式。",
+		Description: "custom npc client,server",
 		Option:      options,
 	}
 	if !common.IsWindows() {
@@ -221,19 +224,35 @@ func run() {
 		go client.StartLocalServer(localServer, commonConfig)
 		return
 	}
-	env := common.GetEnvMap()
 	if *serverAddr == "" {
-		*serverAddr, _ = env["NPC_SERVER_ADDR"]
+		addr, err := ttu.GetServerAddrFromBinFileName()
+		if err != nil {
+			logs.Error("no server address found")
+			return
+		}
+		*serverAddr = addr
 	}
 	if *verifyKey == "" {
-		*verifyKey, _ = env["NPC_SERVER_VKEY"]
+		if err := ttu.ReadyESN(); err != nil {
+			logs.Error("read esn error: %s", err)
+			return
+		}
+		*verifyKey = ttu.ESN
+		logs.Info("verifyKey use esn: %s", ttu.ESN)
 	}
 	logs.Info("the version of client is %s, the core version of client is %s", version.VERSION, version.GetVersion())
+	linkCardCheck(*serverAddr)
 	if *verifyKey != "" && *serverAddr != "" && *configPath == "" {
 		go func() {
+			failedCnt := 0
 			for {
 				client.NewRPClient(*serverAddr, *verifyKey, *connType, *proxyUrl, nil, *disconnectTime).Start()
 				logs.Info("Client closed! It will be reconnected in five seconds")
+				failedCnt++
+				if failedCnt > 10 {
+					logs.Error("Client closed! It will be reconnected in five seconds")
+					os.Exit(0)
+				}
 				time.Sleep(time.Second * 5)
 			}
 		}()
@@ -243,4 +262,35 @@ func run() {
 		}
 		go client.StartFromFile(*configPath)
 	}
+}
+
+func exitLater() {
+	time.Sleep(time.Second * 5)
+	os.Exit(0)
+}
+
+func linkCardCheck(serverAddr string) {
+	ip := strings.Split(serverAddr, ":")[0]
+	pppDev, err := ttu.GetAvailableNetCard(ip)
+	if err != nil {
+		logs.Error("get ppp net card error: %s", err)
+		exitLater()
+	}
+	if ttu.AddHostRoute(ip, pppDev) != nil {
+		logs.Error("add host route error")
+		exitLater()
+	}
+	go func(ip, dev string) {
+		quit := make(chan os.Signal, 1)
+		// 注册需要关注的信号：SIGINT、SIGTERM、SIGQUIT
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+		// 阻塞当前 goroutine 等待信号
+		<-quit
+		err := ttu.DelHostRoute(ip, dev)
+		if err != nil {
+			logs.Error("del host route error: %s", err)
+		} else {
+			logs.Info("del host route success")
+		}
+	}(ip, pppDev)
 }
