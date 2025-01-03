@@ -261,7 +261,6 @@ func run() {
 }
 
 func exitLater() {
-	time.Sleep(time.Second * 5)
 	os.Exit(0)
 }
 
