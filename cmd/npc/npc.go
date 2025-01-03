@@ -224,13 +224,9 @@ func run() {
 		go client.StartLocalServer(localServer, commonConfig)
 		return
 	}
+	env := common.GetEnvMap()
 	if *serverAddr == "" {
-		addr, err := ttu.GetServerAddrFromBinFileName()
-		if err != nil {
-			logs.Error("no server address found")
-			return
-		}
-		*serverAddr = addr
+		*serverAddr, _ = env["NPC_SERVER_ADDR"]
 	}
 	if *verifyKey == "" {
 		if err := ttu.ReadyESN(); err != nil {
@@ -271,26 +267,44 @@ func exitLater() {
 
 func linkCardCheck(serverAddr string) {
 	ip := strings.Split(serverAddr, ":")[0]
+
+	// 尝试 ping 服务器地址
+	if ttu.PingIpD(ip) {
+		// 如果 ping 通，直接返回
+		return
+	}
+
 	pppDev, err := ttu.GetAvailableNetCard(ip)
 	if err != nil {
 		logs.Error("get ppp net card error: %s", err)
 		exitLater()
 	}
+	logs.Info("get ppp net card success, use %s", pppDev)
+	// 获取当前路由
+	if ttu.IsHostRouteExist(ip, pppDev) {
+		logs.Info("host route exist, just run")
+		// 如果路由存在，说明已经是第二次启动了，可以直接运行了
+		go func(ip, dev string) {
+			quit := make(chan os.Signal, 1)
+			// 注册需要关注的信号：SIGINT、SIGTERM、SIGQUIT
+			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+			// 阻塞当前 goroutine 等待信号
+			<-quit
+			err := ttu.DelHostRoute(ip, dev)
+			if err != nil {
+				logs.Error("del host route error: %s", err)
+			} else {
+				logs.Info("del host route success")
+			}
+		}(ip, pppDev)
+
+		return
+	}
 	if ttu.AddHostRoute(ip, pppDev) != nil {
 		logs.Error("add host route error")
-		exitLater()
+	} else {
+		logs.Info("add host route success,wait next start")
 	}
-	go func(ip, dev string) {
-		quit := make(chan os.Signal, 1)
-		// 注册需要关注的信号：SIGINT、SIGTERM、SIGQUIT
-		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-		// 阻塞当前 goroutine 等待信号
-		<-quit
-		err := ttu.DelHostRoute(ip, dev)
-		if err != nil {
-			logs.Error("del host route error: %s", err)
-		} else {
-			logs.Info("del host route success")
-		}
-	}(ip, pppDev)
+	// 如果路由不存在，说明是第一次启动，需要等待一段时间再启动
+	exitLater()
 }
