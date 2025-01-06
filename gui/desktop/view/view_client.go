@@ -36,9 +36,9 @@ type Client struct {
 }
 
 const (
-	STATUS_START     = "给我开始穿!"
-	STATUS_STOP      = "给我停了!"
-	STATUS_RECONNECT = "别急，MD，在重连..."
+	STATUS_START     = "启动!"
+	STATUS_STOP      = "停止!"
+	STATUS_RECONNECT = "重连中..."
 )
 
 func NewClient(c *file.Client) *Client {

@@ -3,12 +3,14 @@ package client
 import (
 	"bufio"
 	"bytes"
-	"ehang.io/nps-mux"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"ehang.io/nps-mux"
 
 	"github.com/astaxie/beego/logs"
 	"github.com/xtaci/kcp-go"
@@ -33,8 +35,9 @@ type TRPClient struct {
 	once           sync.Once
 }
 
-//new client
-func NewRPClient(svraddr string, vKey string, bridgeConnType string, proxyUrl string, cnf *config.Config, disconnectTime int) *TRPClient {
+// new client
+func NewRPClient(svraddr string, vKey string, bridgeConnType string, proxyUrl string, cnf *config.Config,
+	disconnectTime int) *TRPClient {
 	return &TRPClient{
 		svrAddr:        svraddr,
 		p2pAddr:        make(map[string]string, 0),
@@ -50,10 +53,16 @@ func NewRPClient(svraddr string, vKey string, bridgeConnType string, proxyUrl st
 var NowStatus int
 var CloseClient bool
 
-//start
+// start
 func (s *TRPClient) Start() {
 	CloseClient = false
+	retryCnt := 0
 retry:
+	if retryCnt > 10 {
+		logs.Error("The connection server failed more than five times, and the client will exit")
+		os.Exit(0)
+		return
+	}
 	if CloseClient {
 		return
 	}
@@ -62,29 +71,31 @@ retry:
 	if err != nil {
 		logs.Error("The connection server failed and will be reconnected in five seconds, error", err.Error())
 		time.Sleep(time.Second * 5)
+		retryCnt++
 		goto retry
 	}
 	if c == nil {
 		logs.Error("Error data from server, and will be reconnected in five seconds")
 		time.Sleep(time.Second * 5)
+		retryCnt++
 		goto retry
 	}
 	logs.Info("Successful connection with server %s", s.svrAddr)
-	//monitor the connection
+	// monitor the connection
 	go s.ping()
 	s.signal = c
-	//start a channel connection
+	// start a channel connection
 	go s.newChan()
-	//start health check if the it's open
+	// start health check if the it's open
 	if s.cnf != nil && len(s.cnf.Healths) > 0 {
 		go heathCheck(s.cnf.Healths, s.signal)
 	}
 	NowStatus = 1
-	//msg connection, eg udp
+	// msg connection, eg udp
 	s.handleMain()
 }
 
-//handle main connection
+// handle main connection
 func (s *TRPClient) handleMain() {
 	for {
 		flags, err := s.signal.ReadFlag()
@@ -94,13 +105,13 @@ func (s *TRPClient) handleMain() {
 		}
 		switch flags {
 		case common.NEW_UDP_CONN:
-			//read server udp addr and password
+			// read server udp addr and password
 			if lAddr, err := s.signal.GetShortLenContent(); err != nil {
 				logs.Warn(err)
 				return
 			} else if pwd, err := s.signal.GetShortLenContent(); err == nil {
 				var localAddr string
-				//The local port remains unchanged for a certain period of time
+				// The local port remains unchanged for a certain period of time
 				if v, ok := s.p2pAddr[crypt.Md5(string(pwd)+strconv.Itoa(int(time.Now().Unix()/100)))]; !ok {
 					tmpConn, err := common.GetLocalUdpAddr()
 					if err != nil {
@@ -122,7 +133,8 @@ func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 	var localConn net.PacketConn
 	var err error
 	var remoteAddress string
-	if remoteAddress, localConn, err = handleP2PUdp(localAddr, rAddr, md5Password, common.WORK_P2P_PROVIDER); err != nil {
+	if remoteAddress, localConn, err = handleP2PUdp(localAddr, rAddr, md5Password,
+		common.WORK_P2P_PROVIDER); err != nil {
 		logs.Error(err)
 		return
 	}
@@ -142,7 +154,7 @@ func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 		if udpTunnel.RemoteAddr().String() == string(remoteAddress) {
 			conn.SetUdpSession(udpTunnel)
 			logs.Trace("successful connection with client ,address %s", udpTunnel.RemoteAddr().String())
-			//read link info from remote
+			// read link info from remote
 			conn.Accept(nps_mux.NewMux(udpTunnel, s.bridgeConnType, s.disconnectTime), func(c net.Conn) {
 				go s.handleChan(c)
 			})
@@ -151,7 +163,7 @@ func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 	}
 }
 
-//pmux tunnel
+// pmux tunnel
 func (s *TRPClient) newChan() {
 	tunnel, err := NewConn(s.bridgeConnType, s.vKey, s.svrAddr, common.WORK_CHAN, s.proxyUrl)
 	if err != nil {
@@ -177,9 +189,9 @@ func (s *TRPClient) handleChan(src net.Conn) {
 		logs.Error("get connection info from server error ", err)
 		return
 	}
-	//host for target processing
+	// host for target processing
 	lk.Host = common.FormatAddress(lk.Host)
-	//if Conn type is http, read the request and log
+	// if Conn type is http, read the request and log
 	if lk.ConnType == "http" {
 		if targetConn, err := net.DialTimeout(common.CONN_TCP, lk.Host, lk.Option.Timeout); err != nil {
 			logs.Warn("connect to %s error %s", lk.Host, err.Error())
@@ -197,7 +209,8 @@ func (s *TRPClient) handleChan(src net.Conn) {
 					targetConn.Close()
 					break
 				} else {
-					logs.Trace("http request, method %s, host %s, url %s, remote address %s", r.Method, r.Host, r.URL.Path, r.RemoteAddr)
+					logs.Trace("http request, method %s, host %s, url %s, remote address %s", r.Method, r.Host,
+						r.URL.Path, r.RemoteAddr)
 					r.Write(targetConn)
 				}
 			}
@@ -208,7 +221,7 @@ func (s *TRPClient) handleChan(src net.Conn) {
 		logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)
 		s.handleUdp(src)
 	}
-	//connect to target if conn type is tcp or udp
+	// connect to target if conn type is tcp or udp
 	if targetConn, err := net.DialTimeout(lk.ConnType, lk.Host, lk.Option.Timeout); err != nil {
 		logs.Warn("connect to %s error %s", lk.Host, err.Error())
 		src.Close()
