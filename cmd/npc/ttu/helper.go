@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"ehang.io/nps/cmd/npc/iping"
 )
 
 func PingIpD(ip string) bool {
@@ -18,7 +20,7 @@ func PingIpD(ip string) bool {
 		return false
 	}
 	// 正则匹配包丢失率
-	//X received, X% packet loss
+	// X received, X% packet loss
 	re := regexp.MustCompile(`(\d+)% packet loss`)
 	matched := re.FindStringSubmatch(string(ret))
 	if len(matched) < 2 {
@@ -41,7 +43,7 @@ func PingIp(ip, inf string) bool {
 		return false
 	}
 	// 正则匹配包丢失率
-	//X received, X% packet loss
+	// X received, X% packet loss
 	re := regexp.MustCompile(`(\d+)% packet loss`)
 	matched := re.FindStringSubmatch(string(ret))
 	if len(matched) < 2 {
@@ -56,23 +58,11 @@ func PingIp(ip, inf string) bool {
 }
 
 func GetAvailableNetCard(ip string) (string, error) {
-	nets, err := net.Interfaces()
-	if err != nil {
-		log.Fatalf("get net interfaces error: %s", err)
+	card, _ := iping.FindNetInterfaceWhichCanAssessInternet(ip, func(inf net.Interface) bool {
+		return strings.Contains(inf.Name, "ppp")
+	})
+	if card == nil {
+		return "", errors.New("no available net card")
 	}
-	var pppNetCard []string
-	for _, inf := range nets {
-		if strings.Contains(inf.Name, "ppp") {
-			pppNetCard = append(pppNetCard, inf.Name)
-		}
-	}
-	if len(pppNetCard) == 0 {
-		return "", errors.New("no ppp net card")
-	}
-	for _, inf := range pppNetCard {
-		if PingIp(ip, inf) {
-			return inf, nil
-		}
-	}
-	return "", errors.New("no available net card")
+	return card.Name, nil
 }

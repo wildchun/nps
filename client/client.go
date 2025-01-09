@@ -58,7 +58,7 @@ func (s *TRPClient) Start() {
 	CloseClient = false
 	retryCnt := 0
 retry:
-	if retryCnt > 10 {
+	if retryCnt > 3 {
 		logs.Error("The connection server failed more than five times, and the client will exit")
 		os.Exit(0)
 		return

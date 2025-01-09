@@ -81,8 +81,11 @@ func AddHostRoute(dstIp string, dev string) error {
 		if item.DstIp == dstIp && item.DevNic == dev {
 			return nil
 		}
+		if item.DstIp == dstIp {
+			// 删除原来的路由
+			_ = DelHostRoute(dstIp, item.DevNic)
+		}
 	}
-
 	cmd := exec.Command("route", "add", "-host", dstIp, "dev", dev)
 	return cmd.Run()
 }

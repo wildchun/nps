@@ -1,18 +1,8 @@
 package main
 
 import (
-	"ehang.io/nps/client"
-	"ehang.io/nps/cmd/npc/ttu"
-	"ehang.io/nps/lib/common"
-	"ehang.io/nps/lib/config"
-	"ehang.io/nps/lib/file"
-	"ehang.io/nps/lib/install"
-	"ehang.io/nps/lib/version"
 	"flag"
 	"fmt"
-	"github.com/astaxie/beego/logs"
-	"github.com/ccding/go-stun/stun"
-	"github.com/kardianos/service"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -21,28 +11,43 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"ehang.io/nps/client"
+	"ehang.io/nps/cmd/npc/ttu"
+	"ehang.io/nps/lib/common"
+	"ehang.io/nps/lib/config"
+	"ehang.io/nps/lib/file"
+	"ehang.io/nps/lib/install"
+	"ehang.io/nps/lib/version"
+	"github.com/astaxie/beego/logs"
+	"github.com/ccding/go-stun/stun"
+	"github.com/kardianos/service"
 )
 
 var (
-	serverAddr     = flag.String("server", "", "Server addr (ip:port)")
-	configPath     = flag.String("config", "", "Configuration file path")
-	verifyKey      = flag.String("vkey", "", "Authentication key")
-	logType        = flag.String("log", "stdout", "Log output mode（stdout|file）")
-	connType       = flag.String("type", "tcp", "Connection type with the server（kcp|tcp）")
-	proxyUrl       = flag.String("proxy", "", "proxy socks5 url(eg:socks5://111:222@127.0.0.1:9007)")
-	logLevel       = flag.String("log_level", "7", "log level 0~7")
-	registerTime   = flag.Int("time", 2, "register time long /h")
-	localPort      = flag.Int("local_port", 2000, "p2p local port")
-	password       = flag.String("password", "", "p2p password flag")
-	target         = flag.String("target", "", "p2p target")
-	localType      = flag.String("local_type", "p2p", "p2p target")
-	logPath        = flag.String("log_path", "", "npc log path")
-	debug          = flag.Bool("debug", true, "npc debug")
-	pprofAddr      = flag.String("pprof", "", "PProf debug addr (ip:port)")
-	stunAddr       = flag.String("stun_addr", "stun.stunprotocol.org:3478", "stun server address (eg:stun.stunprotocol.org:3478)")
+	serverAddr   = flag.String("server", "", "Server addr (ip:port)")
+	configPath   = flag.String("config", "", "Configuration file path")
+	verifyKey    = flag.String("vkey", "", "Authentication key")
+	logType      = flag.String("log", "stdout", "Log output mode（stdout|file）")
+	connType     = flag.String("type", "tcp", "Connection type with the server（kcp|tcp）")
+	proxyUrl     = flag.String("proxy", "", "proxy socks5 url(eg:socks5://111:222@127.0.0.1:9007)")
+	logLevel     = flag.String("log_level", "7", "log level 0~7")
+	registerTime = flag.Int("time", 2, "register time long /h")
+	localPort    = flag.Int("local_port", 2000, "p2p local port")
+	password     = flag.String("password", "", "p2p password flag")
+	target       = flag.String("target", "", "p2p target")
+	localType    = flag.String("local_type", "p2p", "p2p target")
+	logPath      = flag.String("log_path", "", "npc log path")
+	debug        = flag.Bool("debug", true, "npc debug")
+	pprofAddr    = flag.String("pprof", "", "PProf debug addr (ip:port)")
+	stunAddr     = flag.String("stun_addr", "stun.stunprotocol.org:3478",
+		"stun server address (eg:stun.stunprotocol.org:3478)")
 	ver            = flag.Bool("version", false, "show current version")
-	disconnectTime = flag.Int("disconnect_timeout", 60, "not receiving check packet times, until timeout will disconnect the client")
+	disconnectTime = flag.Int("disconnect_timeout", 60,
+		"not receiving check packet times, until timeout will disconnect the client")
 )
+
+var NPC_VERSION = "ttu_custom_v1.0.2-20250109"
 
 func main() {
 	flag.Parse()
@@ -62,9 +67,10 @@ func main() {
 	if *debug {
 		logs.SetLogger(logs.AdapterConsole, `{"level":`+*logLevel+`,"color":true}`)
 	} else {
-		logs.SetLogger(logs.AdapterFile, `{"level":`+*logLevel+`,"filename":"`+*logPath+`","daily":false,"maxlines":100000,"color":true}`)
+		logs.SetLogger(logs.AdapterFile,
+			`{"level":`+*logLevel+`,"filename":"`+*logPath+`","daily":false,"maxlines":100000,"color":true}`)
 	}
-
+	logs.Info("npc version:", NPC_VERSION)
 	// init service
 	options := make(service.KeyValue)
 	svcConfig := &service.Config{
@@ -76,7 +82,8 @@ func main() {
 	if !common.IsWindows() {
 		svcConfig.Dependencies = []string{
 			"Requires=network.target",
-			"After=network-online.target syslog.target"}
+			"After=network-online.target syslog.target",
+		}
 		svcConfig.Option["SystemdScript"] = install.SystemdScript
 		svcConfig.Option["SysvScript"] = install.SysvScript
 	}
@@ -208,7 +215,7 @@ func (p *npc) run() error {
 
 func run() {
 	common.InitPProfFromArg(*pprofAddr)
-	//p2p or secret command
+	// p2p or secret command
 	if *password != "" {
 		commonConfig := new(config.CommonConfig)
 		commonConfig.Server = *serverAddr
@@ -245,7 +252,7 @@ func run() {
 				client.NewRPClient(*serverAddr, *verifyKey, *connType, *proxyUrl, nil, *disconnectTime).Start()
 				logs.Info("Client closed! It will be reconnected in five seconds")
 				failedCnt++
-				if failedCnt > 10 {
+				if failedCnt > 3 {
 					logs.Error("Client closed! It will be reconnected in five seconds")
 					os.Exit(0)
 				}
@@ -253,10 +260,7 @@ func run() {
 			}
 		}()
 	} else {
-		if *configPath == "" {
-			*configPath = common.GetConfigPath()
-		}
-		go client.StartFromFile(*configPath)
+		logs.Error("serverAddr or verifyKey is empty")
 	}
 }
 
@@ -266,7 +270,6 @@ func exitLater() {
 
 func linkCardCheck(serverAddr string) {
 	ip := strings.Split(serverAddr, ":")[0]
-
 	// 尝试 ping 服务器地址
 	if ttu.PingIpD(ip) {
 		// 如果 ping 通，直接返回
@@ -296,7 +299,6 @@ func linkCardCheck(serverAddr string) {
 				logs.Info("del host route success")
 			}
 		}(ip, pppDev)
-
 		return
 	}
 	if ttu.AddHostRoute(ip, pppDev) != nil {
