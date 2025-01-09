@@ -5,12 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
-	"time"
 
 	"ehang.io/nps/client"
 	"ehang.io/nps/cmd/npc/ttu"
@@ -247,16 +244,10 @@ func run() {
 	linkCardCheck(*serverAddr)
 	if *verifyKey != "" && *serverAddr != "" && *configPath == "" {
 		go func() {
-			failedCnt := 0
 			for {
 				client.NewRPClient(*serverAddr, *verifyKey, *connType, *proxyUrl, nil, *disconnectTime).Start()
-				logs.Info("Client closed! It will be reconnected in five seconds")
-				failedCnt++
-				if failedCnt > 3 {
-					logs.Error("Client closed! It will be reconnected in five seconds")
-					os.Exit(0)
-				}
-				time.Sleep(time.Second * 5)
+				logs.Info("Client closed! exit ")
+				os.Exit(0)
 			}
 		}()
 	} else {
@@ -276,36 +267,14 @@ func linkCardCheck(serverAddr string) {
 		return
 	}
 
-	pppDev, err := ttu.GetAvailableNetCard(ip)
+	netInf := ttu.CreateNetInf()
+
+	pppDev, err := netInf.FindAvailableNetCard(ip)
 	if err != nil {
 		logs.Error("get ppp net card error: %s", err)
+		//
 		exitLater()
-	}
-	logs.Info("get ppp net card success, use %s", pppDev)
-	// 获取当前路由
-	if ttu.IsHostRouteExist(ip, pppDev) {
-		logs.Info("host route exist, just run")
-		// 如果路由存在，说明已经是第二次启动了，可以直接运行了
-		go func(ip, dev string) {
-			quit := make(chan os.Signal, 1)
-			// 注册需要关注的信号：SIGINT、SIGTERM、SIGQUIT
-			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-			// 阻塞当前 goroutine 等待信号
-			<-quit
-			err := ttu.DelHostRoute(ip, dev)
-			if err != nil {
-				logs.Error("del host route error: %s", err)
-			} else {
-				logs.Info("del host route success")
-			}
-		}(ip, pppDev)
 		return
 	}
-	if ttu.AddHostRoute(ip, pppDev) != nil {
-		logs.Error("add host route error")
-	} else {
-		logs.Info("add host route success,wait next start")
-	}
-	// 如果路由不存在，说明是第一次启动，需要等待一段时间再启动
-	exitLater()
+	logs.Info("get ppp net card success, use %s", pppDev.Name)
 }

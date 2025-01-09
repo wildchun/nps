@@ -35,10 +35,10 @@ func FindNetInterfaceWhichCanAssessInternet(host string, filter ...func(inf net.
 			continue
 		}
 		fmt.Println("try interface: ", iface.Name)
-		if ip, err := getInfAddress(&iface); err != nil {
+		if ip, err := GetInfAddress(&iface); err != nil {
 			continue
 		} else {
-			if p.ping3(host, ip) {
+			if p.Ping3(host, ip) {
 
 				return &iface, nil
 			}

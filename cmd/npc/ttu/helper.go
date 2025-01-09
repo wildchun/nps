@@ -1,14 +1,9 @@
 package ttu
 
 import (
-	"errors"
 	"log"
-	"net"
 	"os/exec"
 	"regexp"
-	"strings"
-
-	"ehang.io/nps/cmd/npc/iping"
 )
 
 func PingIpD(ip string) bool {
@@ -55,14 +50,4 @@ func PingIp(ip, inf string) bool {
 		return false
 	}
 	return true
-}
-
-func GetAvailableNetCard(ip string) (string, error) {
-	card, _ := iping.FindNetInterfaceWhichCanAssessInternet(ip, func(inf net.Interface) bool {
-		return strings.Contains(inf.Name, "ppp")
-	})
-	if card == nil {
-		return "", errors.New("no available net card")
-	}
-	return card.Name, nil
 }

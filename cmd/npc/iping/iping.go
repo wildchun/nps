@@ -31,7 +31,7 @@ func NewPingOption() *PingOption {
 	}
 }
 
-func getInfAddress(inf *net.Interface) (net.IP, error) {
+func GetInfAddress(inf *net.Interface) (net.IP, error) {
 	addrs, err := inf.Addrs()
 	if err != nil {
 		return nil, err
@@ -45,11 +45,11 @@ func getInfAddress(inf *net.Interface) (net.IP, error) {
 	return nil, fmt.Errorf("interface %s has no ip address", inf.Name)
 }
 
-// ping连接用的协议是ICMP，原理：
+// Ping3连接用的协议是ICMP，原理：
 // Ping的基本原理是发送和接受ICMP请求回显报文。接收方将报文原封不动的返回发送方，发送方校验报文，校验成功则表示ping通。
 // 一台主机向一个节点发送一个类型字段值为8的ICMP报文，如果途中没有异常（如果没有被路由丢弃，目标不回应ICMP或者传输失败），
 // 则目标返回类型字段值为0的ICMP报文，说明这台主机可达
-func (p *PingOption) ping3(host string, ip net.IP) bool {
+func (p *PingOption) Ping3(host string, ip net.IP) bool {
 	// 要发送的回显请求数
 	var count int = p.Count
 	var size int = p.Size
@@ -58,10 +58,10 @@ func (p *PingOption) ping3(host string, ip net.IP) bool {
 	// 查找规范的dns主机名字  eg.www.baidu.com->www.a.shifen.com
 	cname, _ := net.LookupCNAME(host)
 	starttime := time.Now()
-	dialer := net.Dialer{LocalAddr: &net.IPAddr{IP: ip}, Timeout: time.Duration(timeout * 1000 * 1000)}
+	// dialer := net.Dialer{LocalAddr: &net.IPAddr{IP: ip}, Timeout: time.Duration(timeout * 1000 * 1000)}
 	// 此处的链接conn只是为了获得ip := conn.RemoteAddr(),显示出来，因为后面每次连接都会重新获取conn,todo 但是每次重新获取的conn,其连接的ip保证一致么？
 	// conn, err := net.DialTimeout("ip4:icmp", host, time.Duration(timeout*1000*1000))
-	conn, err := dialer.Dial("ip:icmp", host)
+	// conn, err := dialer.Dial("ip:icmp", host)
 	// 每个域名可能对应多个ip，但实际连接时，请求只会转发到某一个上，故需要获取实际连接的远程ip，才能知道实际ping的机器是哪台
 	//  ip := conn.RemoteAddr()
 	//  fmt.Println("正在 Ping " + cname + " [" + ip.String() + "] 具有 32 字节的数据:")
@@ -109,7 +109,7 @@ func (p *PingOption) ping3(host string, ip net.IP) bool {
 		msg[3] = byte(check & 255)
 
 		dialer := net.Dialer{LocalAddr: &net.IPAddr{IP: ip}, Timeout: time.Duration(timeout * 1000 * 1000)}
-		conn, err = dialer.Dial("ip:icmp", host)
+		conn, err := dialer.Dial("ip:icmp", host)
 
 		// todo test
 		// ip := conn.RemoteAddr()
