@@ -262,14 +262,10 @@ func exitLater() {
 	os.Exit(0)
 }
 
+var p2pLinkDaemon *ttu.LinkDaemon
+
 func linkCardCheck(serverAddr string) {
 	ip := strings.Split(serverAddr, ":")[0]
-	// 尝试 ping 服务器地址
-	if ttu.PingIpD(ip) {
-		// 如果 ping 通，直接返回
-		return
-	}
-
 	netInf := ttu.CreateNetInf()
 	pppInfs := netInf.GetP2PNetCard()
 	pppDev, err := netInf.FindAvailableNetCard(ip, pppInfs)
@@ -290,6 +286,12 @@ func linkCardCheck(serverAddr string) {
 		outInf := pppDev
 		setDefaultRoute(inner, outInf)
 	}
+
+	p2pLinkDaemon = &ttu.LinkDaemon{
+		OutDev: pppDev.Name,
+		P2P:    ttu.NewP2PDaemon(),
+	}
+	p2pLinkDaemon.Start()
 }
 
 func setDefaultRoute(inner, out net.Interface) {

@@ -132,3 +132,13 @@ func DelNetRoute(net, netmask, dev string) error {
 	cmd := exec.Command("route", "del", "-net", net, "netmask", netmask, "dev", dev)
 	return cmd.Run()
 }
+
+func AddFullNetRoute(dev, metric string) error {
+	cmd := exec.Command("route", "add", "-net", "0.0.0.0", "netmask", "0.0.0.0", "metric", metric, "dev", dev)
+	return cmd.Run()
+}
+
+func DelFullNetRoute(dev string) error {
+	cmd := exec.Command("route", "del", "-net", "0.0.0.0", "netmask", "0.0.0.0", "dev", dev)
+	return cmd.Run()
+}
