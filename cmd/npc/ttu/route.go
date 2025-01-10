@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type Item struct {
@@ -92,7 +94,7 @@ func AddHostRoute(dstIp string, dev string) error {
 func DelHostRoute(dstIp string, dev string) error {
 	items, err := ReadSysRoute()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "read sys route error")
 	}
 	exist := false
 	for _, item := range items {
@@ -119,4 +121,14 @@ func IsHostRouteExist(dstIp string, dev string) bool {
 		}
 	}
 	return false
+}
+
+func AddNetRoute(net, netmask, metric, dev string) error {
+	cmd := exec.Command("route", "add", "-net", net, "netmask", netmask, "metric", metric, "dev", dev)
+	return cmd.Run()
+}
+
+func DelNetRoute(net, netmask, dev string) error {
+	cmd := exec.Command("route", "del", "-net", net, "netmask", netmask, "dev", dev)
+	return cmd.Run()
 }

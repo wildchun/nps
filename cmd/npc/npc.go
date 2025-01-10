@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"runtime"
@@ -44,7 +45,7 @@ var (
 		"not receiving check packet times, until timeout will disconnect the client")
 )
 
-var NPC_VERSION = "ttu_custom_v1.0.2-20250109"
+var NPC_VERSION = "ttu_custom_v1.0.3-20250110"
 
 func main() {
 	flag.Parse()
@@ -67,13 +68,15 @@ func main() {
 		logs.SetLogger(logs.AdapterFile,
 			`{"level":`+*logLevel+`,"filename":"`+*logPath+`","daily":false,"maxlines":100000,"color":true}`)
 	}
+
 	logs.Info("npc version:", NPC_VERSION)
+
 	// init service
 	options := make(service.KeyValue)
 	svcConfig := &service.Config{
 		Name:        "Npc",
-		DisplayName: "nps内网穿透客户端",
-		Description: "custom npc client,server",
+		DisplayName: "Npc",
+		Description: "custom npc client ,version:" + NPC_VERSION,
 		Option:      options,
 	}
 	if !common.IsWindows() {
@@ -268,8 +271,8 @@ func linkCardCheck(serverAddr string) {
 	}
 
 	netInf := ttu.CreateNetInf()
-
-	pppDev, err := netInf.FindAvailableNetCard(ip)
+	pppInfs := netInf.GetP2PNetCard()
+	pppDev, err := netInf.FindAvailableNetCard(ip, pppInfs)
 	if err != nil {
 		logs.Error("get ppp net card error: %s", err)
 		//
@@ -277,4 +280,32 @@ func linkCardCheck(serverAddr string) {
 		return
 	}
 	logs.Info("get ppp net card success, use %s", pppDev.Name)
+
+	if len(pppInfs) == 2 {
+		// 尝试把内网卡绑定为默认路由
+		inner := pppInfs[0]
+		if pppDev.Name == pppInfs[0].Name {
+			inner = pppInfs[1]
+		}
+		outInf := pppDev
+		setDefaultRoute(inner, outInf)
+	}
+}
+
+func setDefaultRoute(inner, out net.Interface) {
+	logs.Info("start to set default route")
+	// 删除所有默认路由
+	err := ttu.DelNetRoute("0.0.0.0", "0.0.0.0", inner.Name)
+	logs.Info("del default route: net 0.0.0.0 netmask 0.0.0.0 dev %v, ret : %v", inner.Name, err)
+
+	err = ttu.DelNetRoute("0.0.0.0", "0.0.0.0", out.Name)
+	logs.Info("del default route: net 0.0.0.0 netmask 0.0.0.0 dev %v, ret : %v", out.Name, err)
+
+	err = ttu.AddNetRoute("0.0.0.0", "0.0.0.0", "0", inner.Name)
+	logs.Info("add default route: net 0.0.0.0 netmask 0.0.0.0 metric 0 dev %v, ret : %v", inner.Name, err)
+
+	err = ttu.AddNetRoute("0.0.0.0", "0.0.0.0", "1", out.Name)
+	logs.Info("add default route: net 0.0.0.0 netmask 0.0.0.0 metric 1 dev %v, ret : %v", out.Name, err)
+	// sudo route del -net 0.0.0.0 netmask 0.0.0.0  dev ppp-1
+	// sudo route add -net 0.0.0.0 netmask 0.0.0.0 metric 0 dev ppp-1
 }
