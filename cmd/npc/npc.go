@@ -45,7 +45,7 @@ var (
 		"not receiving check packet times, until timeout will disconnect the client")
 )
 
-var NPC_VERSION = "ttu_custom_v1.0.3-20250110"
+var NPC_VERSION = "ttu_custom_v1.0.4-20250115"
 
 func main() {
 	flag.Parse()

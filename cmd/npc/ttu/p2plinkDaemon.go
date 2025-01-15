@@ -13,9 +13,10 @@ import (
 )
 
 type LinkDaemon struct {
-	OutDev string
-	P2P    *P2PDaemon
-	d      func(f func())
+	OutDev    string
+	P2P       *P2PDaemon
+	d         func(f func())
+	lastCount int
 }
 
 func (l *LinkDaemon) Start() {
@@ -25,6 +26,7 @@ func (l *LinkDaemon) Start() {
 		logs.Error("start p2p daemon error: %v", err)
 		return
 	}
+	l.lastCount = len(l.P2P.Links())
 	logs.Info("start p2p daemon ,out dev: %v", l.OutDev)
 }
 
@@ -55,7 +57,7 @@ func (l *LinkDaemon) onSingleP2PLinkExist() {
 	logs.Info("add default route: net 0.0.0.0 netmask 0.0.0.0 dev %v, ret : %v", inf.Name, err)
 
 	// 如果外网卡掉线了  退出程序
-	if inf.Name == l.OutDev {
+	if inf.Name != l.OutDev {
 		logs.Error("out dev %v offline, exit", l.OutDev)
 		os.Exit(0)
 	}
