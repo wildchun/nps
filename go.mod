@@ -33,3 +33,4 @@ require (
 )
 
 replace github.com/astaxie/beego => github.com/exfly/beego v1.12.0-export-init
+replace ehang.io/nps-mux => ./replace/nps-mux
