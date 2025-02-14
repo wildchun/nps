@@ -1,10 +1,10 @@
 package bridge
 
 import (
-	"ehang.io/nps-mux"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"ehang.io/nps-mux"
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/conn"
 	"ehang.io/nps/lib/crypt"
@@ -22,6 +23,8 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
 )
+
+var tcpKeepaliveInterval int = 0
 
 type Client struct {
 	tunnel    *nps_mux.Mux
@@ -41,16 +44,16 @@ func NewClient(t, f *nps_mux.Mux, s *conn.Conn, vs string) *Client {
 }
 
 type Bridge struct {
-	TunnelPort     int //通信隧道端口
+	TunnelPort     int // 通信隧道端口
 	Client         sync.Map
 	Register       sync.Map
-	tunnelType     string //bridge type kcp or tcp
+	tunnelType     string // bridge type kcp or tcp
 	OpenTask       chan *file.Tunnel
 	CloseTask      chan *file.Tunnel
 	CloseClient    chan int
 	SecretChan     chan *conn.Secret
 	ipVerify       bool
-	runList        sync.Map //map[int]interface{}
+	runList        sync.Map // map[int]interface{}
 	disconnectTime int
 }
 
@@ -72,9 +75,10 @@ func (s *Bridge) StartTunnel() error {
 	go s.ping()
 	if s.tunnelType == "kcp" {
 		logs.Info("server start, the bridge type is %s, the bridge port is %d", s.tunnelType, s.TunnelPort)
-		return conn.NewKcpListenerAndProcess(beego.AppConfig.String("bridge_ip")+":"+beego.AppConfig.String("bridge_port"), func(c net.Conn) {
-			s.cliProcess(conn.NewConn(c))
-		})
+		return conn.NewKcpListenerAndProcess(beego.AppConfig.String("bridge_ip")+":"+beego.AppConfig.String("bridge_port"),
+			func(c net.Conn) {
+				s.cliProcess(conn.NewConn(c))
+			})
 	} else {
 		listener, err := connection.GetBridgeListener(s.tunnelType)
 		if err != nil {
@@ -89,12 +93,12 @@ func (s *Bridge) StartTunnel() error {
 	return nil
 }
 
-//get health information form client
+// get health information form client
 func (s *Bridge) GetHealthFromClient(id int, c *conn.Conn) {
 	for {
 		if info, status, err := c.GetHealthInfo(); err != nil {
 			break
-		} else if !status { //the status is true , return target to the targetArr
+		} else if !status { // the status is true , return target to the targetArr
 			file.GetDb().JsonDb.Tasks.Range(func(key, value interface{}) bool {
 				v := value.(*file.Tunnel)
 				if v.Client.Id == id && v.Mode == "tcp" && strings.Contains(v.Target.TargetStr, info) {
@@ -127,10 +131,11 @@ func (s *Bridge) GetHealthFromClient(id int, c *conn.Conn) {
 				}
 				return true
 			})
-		} else { //the status is false,remove target from the targetArr
+		} else { // the status is false,remove target from the targetArr
 			file.GetDb().JsonDb.Tasks.Range(func(key, value interface{}) bool {
 				v := value.(*file.Tunnel)
-				if v.Client.Id == id && v.Mode == "tcp" && common.IsArrContains(v.HealthRemoveArr, info) && !common.IsArrContains(v.Target.TargetArr, info) {
+				if v.Client.Id == id && v.Mode == "tcp" && common.IsArrContains(v.HealthRemoveArr,
+					info) && !common.IsArrContains(v.Target.TargetArr, info) {
 					v.Lock()
 					v.Target.TargetArr = append(v.Target.TargetArr, info)
 					v.HealthRemoveArr = common.RemoveArrVal(v.HealthRemoveArr, info)
@@ -141,7 +146,8 @@ func (s *Bridge) GetHealthFromClient(id int, c *conn.Conn) {
 
 			file.GetDb().JsonDb.Hosts.Range(func(key, value interface{}) bool {
 				v := value.(*file.Host)
-				if v.Client.Id == id && common.IsArrContains(v.HealthRemoveArr, info) && !common.IsArrContains(v.Target.TargetArr, info) {
+				if v.Client.Id == id && common.IsArrContains(v.HealthRemoveArr,
+					info) && !common.IsArrContains(v.Target.TargetArr, info) {
 					v.Lock()
 					v.Target.TargetArr = append(v.Target.TargetArr, info)
 					v.HealthRemoveArr = common.RemoveArrVal(v.HealthRemoveArr, info)
@@ -154,7 +160,7 @@ func (s *Bridge) GetHealthFromClient(id int, c *conn.Conn) {
 	s.DelClient(id)
 }
 
-//验证失败，返回错误验证flag，并且关闭连接
+// 验证失败，返回错误验证flag，并且关闭连接
 func (s *Bridge) verifyError(c *conn.Conn) {
 	c.Write([]byte(common.VERIFY_EER))
 }
@@ -164,18 +170,18 @@ func (s *Bridge) verifySuccess(c *conn.Conn) {
 }
 
 func (s *Bridge) cliProcess(c *conn.Conn) {
-	//read test flag
+	// read test flag
 	if _, err := c.GetShortContent(3); err != nil {
 		logs.Info("The client %s connect error", c.Conn.RemoteAddr(), err.Error())
 		return
 	}
-	//version check
+	// version check
 	if b, err := c.GetShortLenContent(); err != nil || string(b) != version.GetVersion() {
 		logs.Info("The client %s version does not match", c.Conn.RemoteAddr())
 		c.Close()
 		return
 	}
-	//version get
+	// version get
 	var vs []byte
 	var err error
 	if vs, err = c.GetShortLenContent(); err != nil {
@@ -183,16 +189,16 @@ func (s *Bridge) cliProcess(c *conn.Conn) {
 		c.Close()
 		return
 	}
-	//write server version to client
+	// write server version to client
 	c.Write([]byte(crypt.Md5(version.GetVersion())))
 	c.SetReadDeadlineBySecond(5)
 	var buf []byte
-	//get vKey from client
+	// get vKey from client
 	if buf, err = c.GetShortContent(32); err != nil {
 		c.Close()
 		return
 	}
-	//verify
+	// verify
 	id, err := file.GetDb().GetIdByVerifyKey(string(buf), c.Conn.RemoteAddr().String())
 	if err != nil {
 		logs.Info("Current client connection validation error, close this client:", c.Conn.RemoteAddr())
@@ -224,7 +230,7 @@ func (s *Bridge) DelClient(id int) {
 	}
 }
 
-//use different
+// use different
 func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 	isPub := file.GetDb().IsPubClient(id)
 	switch typeVal {
@@ -233,13 +239,18 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 			c.Close()
 			return
 		}
+		if tcpKeepaliveInterval == 0 {
+			tcpKeepaliveInterval = beego.AppConfig.DefaultInt("tcp_keepalive_interval", 30)
+			log.Println("tcp keepalive interval is:", tcpKeepaliveInterval)
+		}
+
 		tcpConn, ok := c.Conn.(*net.TCPConn)
 		if ok {
 			// add tcp keep alive option for signal connection
 			_ = tcpConn.SetKeepAlive(true)
-			_ = tcpConn.SetKeepAlivePeriod(5 * time.Second)
+			_ = tcpConn.SetKeepAlivePeriod(time.Duration(tcpKeepaliveInterval) * time.Second)
 		}
-		//the vKey connect by another ,close the client of before
+		// the vKey connect by another ,close the client of before
 		if v, ok := s.Client.LoadOrStore(id, NewClient(nil, nil, c, vs)); ok {
 			if v.(*Client).signal != nil {
 				v.(*Client).signal.WriteClose()
@@ -276,7 +287,7 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 			v.(*Client).file = muxConn
 		}
 	case common.WORK_P2P:
-		//read md5 secret
+		// read md5 secret
 		if b, err := c.GetShortContent(32); err != nil {
 			logs.Error("p2p error,", err.Error())
 		} else if t := file.GetDb().GetTaskByMd5Password(string(b)); t == nil {
@@ -285,7 +296,7 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 			if v, ok := s.Client.Load(t.Client.Id); !ok {
 				return
 			} else {
-				//向密钥对应的客户端发送与服务端udp建立连接信息，地址，密钥
+				// 向密钥对应的客户端发送与服务端udp建立连接信息，地址，密钥
 				v.(*Client).signal.Write([]byte(common.NEW_UDP_CONN))
 				svrAddr := beego.AppConfig.String("p2p_ip") + ":" + beego.AppConfig.String("p2p_port")
 				if err != nil {
@@ -294,7 +305,7 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 				}
 				v.(*Client).signal.WriteLenContent([]byte(svrAddr))
 				v.(*Client).signal.WriteLenContent(b)
-				//向该请求者发送建立连接请求,服务器地址
+				// 向该请求者发送建立连接请求,服务器地址
 				c.WriteLenContent([]byte(svrAddr))
 			}
 		}
@@ -303,22 +314,23 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 	return
 }
 
-//register ip
+// register ip
 func (s *Bridge) register(c *conn.Conn) {
 	var hour int32
 	if err := binary.Read(c, binary.LittleEndian, &hour); err == nil {
-		s.Register.Store(common.GetIpByAddr(c.Conn.RemoteAddr().String()), time.Now().Add(time.Hour*time.Duration(hour)))
+		s.Register.Store(common.GetIpByAddr(c.Conn.RemoteAddr().String()),
+			time.Now().Add(time.Hour*time.Duration(hour)))
 	}
 }
 
 func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (target net.Conn, err error) {
-	//if the proxy type is local
+	// if the proxy type is local
 	if link.LocalProxy {
 		target, err = net.Dial("tcp", link.Host)
 		return
 	}
 	if v, ok := s.Client.Load(clientId); ok {
-		//If ip is restricted to do ip verification
+		// If ip is restricted to do ip verification
 		if s.ipVerify {
 			ip := common.GetIpByAddr(link.RemoteAddr)
 			if v, ok := s.Register.Load(ip); !ok {
@@ -343,7 +355,7 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 			return
 		}
 		if t != nil && t.Mode == "file" {
-			//TODO if t.mode is file ,not use crypt or compress
+			// TODO if t.mode is file ,not use crypt or compress
 			link.Crypt = false
 			link.Compress = false
 			return
@@ -387,7 +399,7 @@ func (s *Bridge) ping() {
 	}
 }
 
-//get config and add task from client config
+// get config and add task from client config
 func (s *Bridge) getConfig(c *conn.Conn, isPub bool, client *file.Client) {
 	var fail bool
 loop:
@@ -415,7 +427,7 @@ loop:
 				})
 				file.GetDb().JsonDb.Tasks.Range(func(key, value interface{}) bool {
 					v := value.(*file.Tunnel)
-					//if _, ok := s.runList[v.Id]; ok && v.Client.Id == id {
+					// if _, ok := s.runList[v.Id]; ok && v.Client.Id == id {
 					if _, ok := s.runList.Load(v.Id); ok && v.Client.Id == id {
 						str += v.Remark + common.CONN_DATA_SEQ
 					}
