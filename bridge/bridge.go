@@ -191,7 +191,7 @@ func (s *Bridge) cliProcess(c *conn.Conn) {
 	}
 	// write server version to client
 	c.Write([]byte(crypt.Md5(version.GetVersion())))
-	c.SetReadDeadlineBySecond(5)
+	c.SetReadDeadlineBySecond(30)
 	var buf []byte
 	// get vKey from client
 	if buf, err = c.GetShortContent(32); err != nil {
@@ -371,7 +371,7 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 }
 
 func (s *Bridge) ping() {
-	ticker := time.NewTicker(time.Second * 5)
+	ticker := time.NewTicker(time.Second * 60)
 	defer ticker.Stop()
 	for {
 		select {
