@@ -170,7 +170,7 @@ func (s *Mux) ping() {
 		now, _ := time.Now().UTC().MarshalText()
 		s.sendInfo(muxPingFlag, muxPing, now)
 		// send the ping flag and Get the latency first
-		ticker := time.NewTicker(time.Second * 30)
+		ticker := time.NewTicker(time.Second * 60)
 		defer ticker.Stop()
 		for {
 			if s.IsClose {
