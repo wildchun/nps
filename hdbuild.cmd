@@ -6,6 +6,12 @@ go build -ldflags "-s -w -extldflags -static -extldflags -static" -o z_output/li
 @REM scu ttu arm
 set GOARCH=arm
 go build -ldflags "-s -w -extldflags -static -extldflags -static" -o z_output/linux-arm/npc ./cmd/npc/npc.go
+
+SET CGO_ENABLED=0
+SET GOOS=windows
+SET GOARCH=amd64
+go build -ldflags "-s -w -extldflags -static -extldflags -static" -o z_output/windows_server/nps.exe ./cmd/nps/nps.go
+
 @REM desktop
 SET GOARCH=amd64
 SET GOOS=windows

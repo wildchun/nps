@@ -34,14 +34,15 @@ func GetTaskStatus(path string) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	c, err := NewConn(cnf.CommonConfig.Tp, cnf.CommonConfig.VKey, cnf.CommonConfig.Server, common.WORK_CONFIG, cnf.CommonConfig.ProxyUrl)
+	c, err := NewConn(cnf.CommonConfig.Tp, cnf.CommonConfig.VKey, cnf.CommonConfig.Server, common.WORK_CONFIG,
+		cnf.CommonConfig.ProxyUrl)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	if _, err := c.Write([]byte(common.WORK_STATUS)); err != nil {
 		log.Fatalln(err)
 	}
-	//read now vKey and write to server
+	// read now vKey and write to server
 	if f, err := common.ReadAllFromFile(filepath.Join(common.GetTmpPath(), "npc_vkey.txt")); err != nil {
 		log.Fatalln(err)
 	} else if _, err := c.Write([]byte(crypt.Md5(string(f)))); err != nil {
@@ -106,7 +107,8 @@ re:
 		return
 	}
 	first = false
-	c, err := NewConn(cnf.CommonConfig.Tp, cnf.CommonConfig.VKey, cnf.CommonConfig.Server, common.WORK_CONFIG, cnf.CommonConfig.ProxyUrl)
+	c, err := NewConn(cnf.CommonConfig.Tp, cnf.CommonConfig.VKey, cnf.CommonConfig.Server, common.WORK_CONFIG,
+		cnf.CommonConfig.ProxyUrl)
 	if err != nil {
 		logs.Error(err)
 		goto re
@@ -136,7 +138,7 @@ re:
 	}
 	ioutil.WriteFile(filepath.Join(common.GetTmpPath(), "npc_vkey.txt"), []byte(vkey), 0600)
 
-	//send hosts to server
+	// send hosts to server
 	for _, v := range cnf.Hosts {
 		if _, err := c.SendInfo(v, common.NEW_HOST); err != nil {
 			logs.Error(err)
@@ -148,7 +150,7 @@ re:
 		}
 	}
 
-	//send  task to server
+	// send  task to server
 	for _, v := range cnf.Tasks {
 		if _, err := c.SendInfo(v, common.NEW_TASK); err != nil {
 			logs.Error(err)
@@ -159,12 +161,12 @@ re:
 			goto re
 		}
 		if v.Mode == "file" {
-			//start local file server
+			// start local file server
 			go startLocalFileServer(cnf.CommonConfig, v, vkey)
 		}
 	}
 
-	//create local server secret or p2p
+	// create local server secret or p2p
 	for _, v := range cnf.LocalServer {
 		go StartLocalServer(v, cnf.CommonConfig)
 	}
@@ -173,9 +175,11 @@ re:
 	if cnf.CommonConfig.Client.WebUserName == "" || cnf.CommonConfig.Client.WebPassword == "" {
 		logs.Notice("web access login username:user password:%s", vkey)
 	} else {
-		logs.Notice("web access login username:%s password:%s", cnf.CommonConfig.Client.WebUserName, cnf.CommonConfig.Client.WebPassword)
+		logs.Notice("web access login username:%s password:%s", cnf.CommonConfig.Client.WebUserName,
+			cnf.CommonConfig.Client.WebPassword)
 	}
-	NewRPClient(cnf.CommonConfig.Server, vkey, cnf.CommonConfig.Tp, cnf.CommonConfig.ProxyUrl, cnf, cnf.CommonConfig.DisconnectTime).Start()
+	NewRPClient(cnf.CommonConfig.Server, vkey, cnf.CommonConfig.Tp, cnf.CommonConfig.ProxyUrl, cnf,
+		cnf.CommonConfig.DisconnectTime).Start()
 	CloseLocalServer()
 	goto re
 }
@@ -232,7 +236,8 @@ func NewConn(tp string, vkey string, server string, connType string, proxyUrl st
 		return nil, err
 	}
 	if crypt.Md5(version.GetVersion()) != string(b) {
-		logs.Error("The client does not match the server version. The current core version of the client is", version.GetVersion())
+		logs.Error("The client does not match the server version. The current core version of the client is",
+			version.GetVersion())
 		return nil, err
 	}
 	if _, err := c.Write([]byte(common.Getverifyval(vkey))); err != nil {
@@ -251,7 +256,7 @@ func NewConn(tp string, vkey string, server string, connType string, proxyUrl st
 	return c, nil
 }
 
-//http proxy connection
+// http proxy connection
 func NewHttpProxyConn(url *url.URL, remoteAddr string) (net.Conn, error) {
 	req, err := http.NewRequest("CONNECT", "http://"+remoteAddr, nil)
 	if err != nil {
@@ -278,7 +283,7 @@ func NewHttpProxyConn(url *url.URL, remoteAddr string) (net.Conn, error) {
 	return proxyConn, nil
 }
 
-//get a basic auth string
+// get a basic auth string
 func basicAuth(username, password string) string {
 	auth := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(auth))
