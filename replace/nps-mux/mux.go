@@ -47,8 +47,8 @@ type Mux struct {
 }
 
 func NewMux(c net.Conn, connType string, pingCheckThreshold int) *Mux {
-	//c.(*net.TCPConn).SetReadBuffer(0)
-	//c.(*net.TCPConn).SetWriteBuffer(0)
+	// c.(*net.TCPConn).SetReadBuffer(0)
+	// c.(*net.TCPConn).SetWriteBuffer(0)
 	fd, err := getConnFd(c)
 	if err != nil {
 		log.Println(err)
@@ -78,9 +78,9 @@ func NewMux(c net.Conn, connType string, pingCheckThreshold int) *Mux {
 	}
 	m.writeQueue.New()
 	m.newConnQueue.New()
-	//read session by flag
+	// read session by flag
 	m.readSession()
-	//ping
+	// ping
 	m.ping()
 	m.writeSession()
 	return m
@@ -91,10 +91,10 @@ func (s *Mux) NewConn() (*conn, error) {
 		return nil, errors.New("the mux has closed")
 	}
 	conn := NewConn(s.getId(), s)
-	//it must be Set before send
+	// it must be Set before send
 	s.connMap.Set(conn.connId, conn)
 	s.sendInfo(muxNewConn, conn.connId, nil)
-	//Set a timer timeout 120 second
+	// Set a timer timeout 120 second
 	timer := time.NewTimer(time.Minute * 2)
 	defer timer.Stop()
 	select {
@@ -147,13 +147,13 @@ func (s *Mux) writeSession() {
 			if s.IsClose {
 				break
 			}
-			//if pack.flag == muxNewMsg || pack.flag == muxNewMsgPart {
+			// if pack.flag == muxNewMsg || pack.flag == muxNewMsgPart {
 			//	if pack.length >= 100 {
 			//		log.Println("write session id", pack.id, "\n", string(pack.content[:100]))
 			//	} else {
 			//		log.Println("write session id", pack.id, "\n", string(pack.content[:pack.length]))
 			//	}
-			//}
+			// }
 			err := pack.Pack(s.conn)
 			muxPack.Put(pack)
 			if err != nil {
@@ -170,7 +170,7 @@ func (s *Mux) ping() {
 		now, _ := time.Now().UTC().MarshalText()
 		s.sendInfo(muxPingFlag, muxPing, now)
 		// send the ping flag and Get the latency first
-		ticker := time.NewTicker(time.Second * 5)
+		ticker := time.NewTicker(time.Second * 30)
 		defer ticker.Stop()
 		for {
 			if s.IsClose {
@@ -188,6 +188,7 @@ func (s *Mux) ping() {
 			}
 			now, _ = time.Now().UTC().MarshalText()
 			s.sendInfo(muxPingFlag, muxPing, now)
+			log.Println("mux: send muxPingFlag")
 			atomic.AddUint32(&s.pingCheckTime, 1)
 		}
 		return
@@ -211,7 +212,7 @@ func (s *Mux) ping() {
 			if latency > 0 {
 				atomic.StoreUint64(&s.latency, math.Float64bits(s.counter.Latency(latency)))
 				// convert float64 to bits, store it atomic
-				//log.Println("ping", math.Float64frombits(atomic.LoadUint64(&s.latency)))
+				// log.Println("ping", math.Float64frombits(atomic.LoadUint64(&s.latency)))
 			}
 			if cap(data) > 0 && !s.IsClose {
 				windowBuff.Put(data)
@@ -231,7 +232,7 @@ func (s *Mux) readSession() {
 			if s.IsClose {
 				break // make sure that is closed
 			}
-			s.connMap.Set(connection.connId, connection) //it has been Set before send ok
+			s.connMap.Set(connection.connId, connection) // it has been Set before send ok
 			s.newConnCh <- connection
 			s.sendInfo(muxNewConnOk, connection.connId, nil)
 		}
@@ -252,21 +253,22 @@ func (s *Mux) readSession() {
 				break
 			}
 			s.bw.SetCopySize(l)
-			//if pack.flag == muxNewMsg || pack.flag == muxNewMsgPart {
+			// if pack.flag == muxNewMsg || pack.flag == muxNewMsgPart {
 			//	if pack.length >= 100 {
 			//		log.Printf("read session id %d pointer %p\n%v", pack.id, pack.content, string(pack.content[:100]))
 			//	} else {
 			//		log.Printf("read session id %d pointer %p\n%v", pack.id, pack.content, string(pack.content[:pack.length]))
 			//	}
-			//}
+			// }
 			switch pack.flag {
-			case muxNewConn: //New connection
+			case muxNewConn: // New connection
 				connection := NewConn(pack.id, s)
 				s.newConnQueue.Push(connection)
 				continue
-			case muxPingFlag: //ping
-				s.sendInfo(muxPingReturn, muxPing, pack.content)
-				windowBuff.Put(pack.content)
+			case muxPingFlag: // ping
+				// 去掉ping返回，减少网络流量
+				// s.sendInfo(muxPingReturn, muxPing, pack.content)
+				// windowBuff.Put(pack.content)
 				continue
 			case muxPingReturn:
 				s.pingCh <- pack.content
@@ -274,14 +276,14 @@ func (s *Mux) readSession() {
 			}
 			if connection, ok := s.connMap.Get(pack.id); ok && !connection.isClose {
 				switch pack.flag {
-				case muxNewMsg, muxNewMsgPart: //New msg from remote connection
+				case muxNewMsg, muxNewMsgPart: // New msg from remote connection
 					err = s.newMsg(connection, pack)
 					if err != nil {
 						log.Println("mux: read session connection New msg err", err)
 						_ = connection.Close()
 					}
 					continue
-				case muxNewConnOk: //connection ok
+				case muxNewConnOk: // connection ok
 					connection.connStatusOkCh <- struct{}{}
 					continue
 				case muxNewConnFail:
@@ -293,7 +295,7 @@ func (s *Mux) readSession() {
 					}
 					connection.sendWindow.SetSize(pack.window)
 					continue
-				case muxConnClose: //close the connection
+				case muxConnClose: // close the connection
 					connection.closingFlag = true
 					connection.receiveWindow.Stop() // close signal to receive window
 					continue
@@ -311,7 +313,7 @@ func (s *Mux) newMsg(connection *conn, pack *muxPackager) (err error) {
 		err = io.ErrClosedPipe
 		return
 	}
-	//insert into queue
+	// insert into queue
 	if pack.flag == muxNewMsgPart {
 		err = connection.receiveWindow.Write(pack.content, pack.length, true, pack.id)
 	}
@@ -328,7 +330,7 @@ func (s *Mux) Close() (err error) {
 	s.IsClose = true
 	log.Println("close mux")
 	s.connMap.Close()
-	//s.connMap = nil
+	// s.connMap = nil
 	s.closeChan <- struct{}{}
 	close(s.newConnCh)
 	// while target host close socket without finish steps, conn.Close method maybe blocked
@@ -363,7 +365,7 @@ func (s *Mux) release() {
 
 // Get New connId as unique flag
 func (s *Mux) getId() (id int32) {
-	//Avoid going beyond the scope
+	// Avoid going beyond the scope
 	if (math.MaxInt32 - s.id) < 10000 {
 		atomic.StoreInt32(&s.id, 0)
 	}
@@ -439,9 +441,9 @@ func newLatencyCounter() *latencyCounter {
 }
 
 type latencyCounter struct {
-	buf []float64 //buf is a fixed length ring buffer,
+	buf []float64 // buf is a fixed length ring buffer,
 	// if buffer is full, New value will replace the oldest one.
-	headMin uint8 //head indicate the head in ring buffer,
+	headMin uint8 // head indicate the head in ring buffer,
 	// in meaning, slot in list will be replaced;
 	// min indicate this slot value is minimal in list.
 
@@ -466,7 +468,7 @@ func (Self *latencyCounter) add(value float64) {
 	Self.buf[head] = value
 	if head == min {
 		min = Self.minimal()
-		//if head equals min, means the min slot already be replaced,
+		// if head equals min, means the min slot already be replaced,
 		// so we need to find another minimal value in the list,
 		// and change the min indicator
 	}
