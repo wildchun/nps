@@ -85,6 +85,9 @@ func (m *Client) setupUi() fyne.CanvasObject {
 		if id.Row == 0 {
 			return
 		}
+		if len(m.d.tunnels) < id.Row {
+			return
+		}
 		tunnel := m.d.tunnels[id.Row-1]
 		switch id.Col {
 		case 0:
@@ -156,7 +159,7 @@ func (m *Client) onStartBtnClicked() {
 			for {
 				m.d.cl = client.NewRPClient(api.NpsServer,
 					m.d.client.VerifyKey,
-					"tcp", "", nil, 60)
+					"tcp", "", nil, 300)
 				m.setStatus(STATUS_STOP)
 				logs.Info("start to connect")
 				m.d.cl.Start()

@@ -16,8 +16,9 @@ import (
 type Login struct {
 	Window fyne.Window
 	ui     struct {
-		keyEdit  *widget.Entry
-		loginBtn *widget.Button
+		keyEdit        *widget.Entry
+		serverAddrEdit *widget.Entry
+		loginBtn       *widget.Button
 	}
 }
 
@@ -30,10 +31,14 @@ func NewLogin() *Login {
 }
 func (m *Login) setupUi() fyne.CanvasObject {
 	m.ui.keyEdit = widget.NewPasswordEntry()
+	m.ui.serverAddrEdit = widget.NewEntry()
 	m.ui.loginBtn = widget.NewButton("登录", m.onLoginBtnClicked)
+	m.ui.serverAddrEdit.Text = api.ServerIp
 	return container.NewVBox(
 		container.New(layout.NewFormLayout(),
-			widget.NewLabel("密钥"),
+			widget.NewLabel("服务地址"),
+			m.ui.serverAddrEdit,
+			widget.NewLabel("密    钥"),
 			m.ui.keyEdit,
 		),
 		m.ui.loginBtn,
@@ -50,6 +55,8 @@ func (m *Login) onLoginBtnClicked() {
 		dialog.ShowError(errors.New("密钥不能为空"), m.Window)
 		return
 	}
+	serverAddr := m.ui.serverAddrEdit.Text
+	api.SetServerAddr(serverAddr)
 	m.ui.loginBtn.Text = "登录中..."
 	m.ui.loginBtn.Refresh()
 	go func(userKey string) {
@@ -72,7 +79,7 @@ func (m *Login) onLoginBtnClicked() {
 				return
 			}
 		}
-		dialog.ShowError(errors.New("鉴权失败:密钥错误"), m.Window)
+		dialog.ShowError(errors.New("鉴权失败:密钥错误/未注册"), m.Window)
 	}(userKey)
 }
 

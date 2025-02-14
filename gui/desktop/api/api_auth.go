@@ -7,14 +7,20 @@ import (
 	"ehang.io/nps/lib/crypt"
 )
 
-const (
-	ServerIp  = "124.223.42.242"
-	Server    = ServerIp + ":10010"
-	NpsServer = ServerIp + ":10011"
+var (
+	ServerIp  = "111.229.33.188"
+	Server    = ServerIp + ":8080"
+	NpsServer = ServerIp + ":8024"
 	CryptKey  = "wildchunwildchun"
 )
 
 var AuthKey string
+
+func SetServerAddr(ip string) {
+	ServerIp = ip
+	Server = ServerIp + ":10010"
+	NpsServer = ServerIp + ":10011"
+}
 
 // map[string][]string
 
