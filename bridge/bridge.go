@@ -240,7 +240,7 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 			return
 		}
 		if tcpKeepaliveInterval == 0 {
-			tcpKeepaliveInterval = beego.AppConfig.DefaultInt("tcp_keepalive_interval", 30)
+			tcpKeepaliveInterval = beego.AppConfig.DefaultInt("tcp_keepalive_interval", 300)
 			log.Println("tcp keepalive interval is:", tcpKeepaliveInterval)
 		}
 

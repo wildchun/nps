@@ -1,9 +1,6 @@
 package main
 
 import (
-	"os"
-	"strings"
-
 	_ "ehang.io/nps/gui/desktop/inerlog"
 	"ehang.io/nps/gui/desktop/view"
 	"ehang.io/nps/lib/common"
@@ -12,6 +9,8 @@ import (
 	"fyne.io/fyne/v2/app"
 	"github.com/astaxie/beego/logs"
 	"github.com/flopp/go-findfont"
+	"os"
+	"strings"
 )
 
 func init() {
@@ -30,7 +29,7 @@ func init() {
 
 func main() {
 	daemon.InitDaemon("npc", common.GetRunPath(), common.GetTmpPath())
-	_ = logs.SetLogger("inerlog")
+	_ = logs.SetLogger("file", `{"filename":"npc_desktop/npc.log"}`)
 	fyne.SetCurrentApp(app.New())
 	w := view.NewLogin().Window
 	w.CenterOnScreen()
